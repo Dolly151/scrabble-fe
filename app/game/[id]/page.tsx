@@ -7,6 +7,7 @@ import { Board } from '@/components/Board';
 import { PlaceWordControls } from '@/components/PlaceWordControls';
 import { Players } from '@/components/Players';
 import { PlayerCards } from '@/components/PlayerCards';
+import { NicknameDialog } from '@/components/NicknameDialog';
 
 export default function GamePage() {
   const { id } = useParams<{ id: string }>();
@@ -15,11 +16,17 @@ export default function GamePage() {
   const error = useGameStore(s => s.error);
 
   useEffect(() => {
-    if (id) loadGame(id);
+    if (id) {
+      // načtení hry podle ID z URL
+      loadGame(id);
+    }
   }, [id, loadGame]);
 
   return (
     <main className="p-4">
+      {/* dialog pro přezdívky hráčů */}
+      <NicknameDialog />
+
       <h1 className="mx-auto max-w-[1400px] p-2 text-2xl font-black">
         GAME ID: {id}
       </h1>
@@ -39,13 +46,13 @@ export default function GamePage() {
             </p>
           )}
 
-          {/* 1) Karty hráčů */}
+          {/* 1) Karty hráčů (jméno + body) */}
           <PlayerCards />
 
           {/* 2) Start cell / ovládání */}
           <PlaceWordControls />
 
-          {/* 3) RACKY obou hráčů */}
+          {/* 3) RACKY hráčů */}
           <Players />
         </aside>
       </div>

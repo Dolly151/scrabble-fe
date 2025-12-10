@@ -51,3 +51,43 @@ export async function placeWord(
     return r.json() as Promise<import('@/types/api').BoardLayoutResp>;
   }
   
+  export async function getAllPlayerPoints(gid: string) {
+    const r = await fetch(`${BASE}/g/${gid}/player-points`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json() as Promise<import('@/types/api').PlayerPointsAllResp>;
+  }
+  
+  export async function getPlayerPoints(gid: string, pnum: number) {
+    const r = await fetch(`${BASE}/g/${gid}/p/${pnum}/points`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json() as Promise<import('@/types/api').PlayerPointsResp>;
+  }
+
+  export async function getLetterValues() {
+    const r = await fetch(`${BASE}/letter-values`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json() as Promise<import('@/types/api').LetterValuesResp>;
+  }
+  
+  // ---- nicknames ----
+
+export async function getPlayerNicknames(gid: string) {
+  const r = await fetch(`${BASE}/g/${gid}/player-nicknames`, {
+    cache: 'no-store',
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<import('@/types/api').PlayerNicknamesResp>;
+}
+
+export async function setPlayerNickname(
+  gid: string,
+  pnum: number,
+  nickname: string,
+) {
+  const url = `${BASE}/g/${gid}/p/${pnum}/set-nickname?n=${encodeURIComponent(
+    nickname,
+  )}`;
+  const r = await fetch(url, { method: 'POST' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<import('@/types/api').SetNicknameResp>;
+}

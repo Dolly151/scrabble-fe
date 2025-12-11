@@ -8,12 +8,13 @@ import { PlaceWordControls } from '@/components/PlaceWordControls';
 import { Players } from '@/components/Players';
 import { PlayerCards } from '@/components/PlayerCards';
 import { NicknameDialog } from '@/components/NicknameDialog';
+import { Rack } from '@/components/Rack';
 
 export default function GamePage() {
   const { id } = useParams<{ id: string }>();
-  const loadGame = useGameStore(s => s.loadGame);
-  const loading = useGameStore(s => s.loading);
-  const error = useGameStore(s => s.error);
+  const loadGame = useGameStore((s) => s.loadGame);
+  const loading = useGameStore((s) => s.loading);
+  const error = useGameStore((s) => s.error);
 
   useEffect(() => {
     if (id) {
@@ -31,11 +32,12 @@ export default function GamePage() {
         GAME ID: {id}
       </h1>
 
-      {/* layout: vlevo deska, vpravo sidebar */}
+      {/* layout: vlevo deska + interaktivní rack, vpravo sidebar */}
       <div className="mx-auto grid max-w-[1400px] gap-6 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px]">
-        {/* Board vlevo */}
-        <section className="order-2 lg:order-1">
+        {/* Board + rack vlevo */}
+        <section className="order-2 lg:order-1 space-y-4">
           <Board />
+          <Rack />
         </section>
 
         {/* Sidebar vpravo */}
@@ -52,7 +54,7 @@ export default function GamePage() {
           {/* 2) Start cell / ovládání */}
           <PlaceWordControls />
 
-          {/* 3) RACKY hráčů */}
+          {/* 3) Racky hráčů jen pro přehled (nemají D&D) */}
           <Players />
         </aside>
       </div>

@@ -4,7 +4,7 @@ import { useGameStore } from '@/store/useGameStore';
 export function PlayerCards() {
   const n = useGameStore(s => s.nPlayers);
   const cur = useGameStore(s => s.currentPlayer);
-  const points = useGameStore(s => s.points);           // pokud máš body podle minula
+  const points = useGameStore(s => s.points);          
   const nicknames = useGameStore(s => s.playerNicknames);
 
   if (!n) return null;

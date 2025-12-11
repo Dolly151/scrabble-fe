@@ -13,15 +13,16 @@ import {
   getAllPlayerPoints,
   getLetterValues,
   skipTurn,
+  replaceLetters,
 } from '@/lib/api';
 
 type Direction = 'row' | 'col';
 
 type PreviewStatus = {
   ok: boolean;
-  overflow?: boolean;
-  conflict?: boolean;
-  missing?: string[];
+  overflow: boolean;
+  conflict: boolean;
+  missing: string[];
 };
 
 type GameStore = {
@@ -42,8 +43,11 @@ type GameStore = {
   start: { x: number; y: number } | null;
   direction: Direction;
   word: string;
-  // pro mapování pozic ve slově na index v racku (kvůli vracení písmen zpět)
   wordRackIndices: (number | null)[];
+
+  // výměna písmen
+  exchanging: boolean;
+  exchangeSelection: number[];
 
   loadGame: (gid: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -52,16 +56,19 @@ type GameStore = {
   setDirection: (d: Direction) => void;
   setWord: (w: string) => void;
   clear: () => void;
+
   place: () => Promise<void>;
   skipTurn: () => Promise<void>;
 
-   // pomocné akce pro rack
-   appendFromRack: (index: number) => void;
-   appendFromKeyboard: (letter: string) => void;
-   backspaceWord: () => void;
- 
+  startExchange: () => void;
+  toggleExchangeIndex: (index: number) => void;
+  cancelExchange: () => void;
+  confirmExchange: () => Promise<void>;
 
-  // drag & drop
+  appendFromRack: (index: number) => void;
+  appendFromKeyboard: (letter: string) => void;
+  backspaceWord: () => void;
+
   placeLetterPreview: (
     x: number,
     y: number,
@@ -72,7 +79,24 @@ type GameStore = {
   previewStatus: () => PreviewStatus;
 };
 
+// type-guard: jestli odpověď z API má pole `letter_values`
+function hasLetterValuesField(
+  obj: unknown,
+): obj is { letter_values: Record<string, number> } {
+  if (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'letter_values' in obj
+  ) {
+    const lv = (obj as Record<string, unknown>)['letter_values'];
+    return typeof lv === 'object' && lv !== null;
+  }
+  return false;
+}
+
+
 export const useGameStore = create<GameStore>((set, get) => ({
+  gameId: undefined,
   board: null,
   layout: null,
   nPlayers: 0,
@@ -90,6 +114,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   word: '',
   wordRackIndices: [],
 
+  exchanging: false,
+  exchangeSelection: [],
+
   async loadGame(gid: string) {
     set({ loading: true, error: null, gameId: gid });
     try {
@@ -98,34 +125,45 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({ layout: lay.board_layout });
       }
 
-      if (Object.keys(get().letterValues).length === 0) {
-        const vals = await getLetterValues();
-        set({ letterValues: vals });
-      }
+      const [b, n, cur, pointsResp, letterValuesResp, nicksResp] =
+        await Promise.all([
+          getBoard(gid),
+          getNumPlayers(gid),
+          getCurrentPlayer(gid),
+          getAllPlayerPoints(gid),
+          getLetterValues(),
+          getPlayerNicknames(gid),
+        ]);
 
-      const [b, n, cur, pts, nicksResp] = await Promise.all([
-        getBoard(gid),
-        getNumPlayers(gid),
-        getCurrentPlayer(gid),
-        getAllPlayerPoints(gid),
-        getPlayerNicknames(gid),
-      ]);
-
+      // ruce hráčů
       const hands: Record<number, string[]> = {};
-      for (let p = 0; p < n.number_of_players; p++) {
-        const h = await getHand(gid, p);
-        hands[p] = h.hand;
+      for (let i = 0; i < n.number_of_players; i++) {
+        const h = await getHand(gid, i);
+        hands[i] = h.hand;
       }
 
+      // body
       const points: Record<number, number> = {};
-      pts.player_points.forEach((val, idx) => {
-        points[idx] = val ?? 0;
+      pointsResp.player_points.forEach((p, idx) => {
+        points[idx] = p;
       });
 
+      // přezdívky
       const playerNicknames: Record<number, string> = {};
       nicksResp.player_nicknames.forEach((name, idx) => {
         playerNicknames[idx] = name;
       });
+
+      // hodnoty písmen – přijmeme obě varianty:
+      // 1) { letter_values: { A: 1, B: 3, ... } }
+      // 2) { A: 1, B: 3, ... }
+      let letterValues: Record<string, number> = {};
+      const raw = letterValuesResp as unknown;
+      if (hasLetterValuesField(raw)) {
+        letterValues = raw.letter_values ?? {};
+      } else {
+        letterValues = (raw as Record<string, number>) ?? {};
+      }
 
       const midY = Math.floor(b.board.length / 2);
       const midX = Math.floor((b.board[0]?.length ?? 0) / 2);
@@ -137,13 +175,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
         currentPlayer: cur.current_player,
         hands,
         points,
+        letterValues,
         playerNicknames,
         start: currentStart,
-        word: '',
-        wordRackIndices: [],
       });
-    } catch (e: unknown) {
-      set({ error: e instanceof Error ? e.message : String(e) });
+    } catch (e) {
+      set({
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       set({ loading: false });
     }
@@ -151,7 +190,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   async refresh() {
     const gid = get().gameId;
-    if (gid) await get().loadGame(gid);
+    if (gid) {
+      await get().loadGame(gid);
+    }
   },
 
   async setNickname(playerIndex, nickname) {
@@ -181,14 +222,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const up = w.toUpperCase();
     set({
       word: up,
-      // ruční psaní neví, z kterého tile je písmeno → null
       wordRackIndices: new Array(up.length).fill(null),
       error: null,
     });
   },
 
   clear() {
-    set({ start: null, word: '', wordRackIndices: [], error: null });
+    set({
+      start: null,
+      word: '',
+      wordRackIndices: [],
+      error: null,
+    });
   },
 
   async place() {
@@ -203,17 +248,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({ word: '', wordRackIndices: [], start: null });
         await get().refresh();
       }
-    } catch (e: unknown) {
-      set({ error: e instanceof Error ? e.message : String(e) });
+    } catch (e) {
+      set({
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       set({ loading: false });
     }
   },
+
   async skipTurn() {
     const { gameId } = get();
     if (!gameId) return;
 
-    // při skipu chceme vyčistit případné rozpracované slovo
     set({
       loading: true,
       error: null,
@@ -229,18 +276,92 @@ export const useGameStore = create<GameStore>((set, get) => ({
       } else {
         await get().refresh();
       }
-    } catch (e: unknown) {
-      set({ error: e instanceof Error ? e.message : String(e) });
+    } catch (e) {
+      set({
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       set({ loading: false });
     }
   },
 
+  // --- výměna písmen ---
 
-  // --- pomocné akce pro rack (klik + back) ---
+  startExchange() {
+    if (get().word) return; // když skládá slovo, neumožníme výměnu
+    set({
+      exchanging: true,
+      exchangeSelection: [],
+      error: null,
+    });
+  },
+
+  toggleExchangeIndex(index) {
+    const { exchanging, exchangeSelection } = get();
+    if (!exchanging) return;
+
+    const exists = exchangeSelection.includes(index);
+    set({
+      exchangeSelection: exists
+        ? exchangeSelection.filter((i) => i !== index)
+        : [...exchangeSelection, index],
+    });
+  },
+
+  cancelExchange() {
+    set({
+      exchanging: false,
+      exchangeSelection: [],
+    });
+  },
+
+  async confirmExchange() {
+    const { gameId, exchanging, exchangeSelection, hands, currentPlayer } =
+      get();
+
+    if (!gameId || !exchanging || exchangeSelection.length === 0) return;
+
+    const rack = hands[currentPlayer] ?? [];
+    const letters = exchangeSelection
+      .map((i) => rack[i])
+      .filter((ch) => typeof ch === 'string')
+      .join('');
+
+    if (!letters) return;
+
+    set({ loading: true, error: null });
+
+    try {
+      const res = await replaceLetters(gameId, letters);
+      if (res.result === 'failed') {
+        set({
+          error: res.error_description ?? 'Exchange failed',
+        });
+      } else {
+        set({
+          word: '',
+          wordRackIndices: [],
+          start: null,
+          exchanging: false,
+          exchangeSelection: [],
+        });
+        await get().refresh();
+      }
+    } catch (e) {
+      set({
+        error: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  // --- práce s rackem ---
 
   appendFromRack(index) {
-    const { currentPlayer, hands, word, wordRackIndices } = get();
+    const { currentPlayer, hands, word, wordRackIndices, exchanging } = get();
+    if (exchanging) return; // v režimu výměny se rackem nepřidává
+
     const rack = hands[currentPlayer] ?? [];
     const ch = rack[index];
     if (!ch) return;
@@ -252,21 +373,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
       error: null,
     });
   },
+
   appendFromKeyboard(letter) {
-    const { currentPlayer, hands, word, wordRackIndices } = get();
+    const { currentPlayer, hands, word, wordRackIndices, exchanging } = get();
+    if (exchanging) return;
+
     const rack = hands[currentPlayer] ?? [];
     if (!rack.length) return;
 
     const upper = letter.toUpperCase();
 
-    // indexy, které už jsou použité v aktuálním slově
     const used = new Set(
       wordRackIndices.filter(
         (i): i is number => i !== null && i !== undefined,
       ),
     );
 
-    // najdeme první nepoužitou dlaždici s tímto písmenem
     let chosenIndex = -1;
     for (let i = 0; i < rack.length; i++) {
       if (used.has(i)) continue;
@@ -276,10 +398,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    if (chosenIndex === -1) {
-      // v racku tohle písmeno nemám → nic nedělám
-      return;
-    }
+    if (chosenIndex === -1) return;
 
     set({
       word: (word || '') + upper,
@@ -288,10 +407,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-
   backspaceWord() {
     const { word, wordRackIndices } = get();
-    if (!word) return;
+    if (!word || word.length === 0) return;
+
     set({
       word: word.slice(0, -1),
       wordRackIndices: wordRackIndices.slice(0, -1),
@@ -299,132 +418,77 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  // --- drag&drop – varianta B, auto row/col, mapování na rack index ---
-
   placeLetterPreview(x, y, letter, rackIndex) {
-    const { board, start, direction, word, wordRackIndices } = get();
+    const { board } = get();
     if (!board) return;
-  
-    const upper = letter.toUpperCase();
-  
-    // zkopírujeme si současný stav
-    let newStart = start ?? null;  // tohle klidně může zůstat s null
-    let dir = direction as 'row' | 'col' | undefined;
-    let curWord = word ?? '';
-    let map = wordRackIndices ? [...wordRackIndices] : [];
 
-  
-    // 1) PRVNÍ PÍSMENO – nový náhled, reset direction
-    if (!curWord) {
-      newStart = { x, y };
-      curWord = upper;
-      map = [rackIndex ?? null];
-    
-      set({
-        start: newStart,
-        direction: undefined,   // ← klíčová změna
-        word: curWord,
-        wordRackIndices: map,
-        error: null,
-      });
-      
-      return;
+    const rows = board.length;
+    const cols = board[0]?.length ?? 0;
+
+    if (x < 0 || y < 0 || y >= rows || x >= cols) return;
+
+    const newBoard = board.map((row) => [...row]);
+
+    if (newBoard[y][x] === '.') {
+      newBoard[y][x] = letter.toUpperCase();
     }
-    
-  
-    // pro jistotu – pokud máme word, ale nemáme start, vezmeme aktuální pole jako start
-    if (!newStart) {
-      newStart = { x, y };
-    }
-  
-    // 2) URČENÍ / KONTROLA SMĚRU
-    if (!dir) {
-      // jsme u druhého písmena – určujeme směr podle pozice
-      if (x === newStart.x && y !== newStart.y) {
-        dir = 'col';
-      } else if (y === newStart.y && x !== newStart.x) {
-        dir = 'row';
-      } else {
-        // stejné pole nebo diagonála – nedává směr, ignorujeme
-        return;
-      }
-    } else {
-      // směr už je daný, musíme ho respektovat
-      if (dir === 'row' && y !== newStart.y) return;
-      if (dir === 'col' && x !== newStart.x) return;
-    }
-  
-    // 3) INDEX VE SLOVĚ podle směru
-    const idx = dir === 'row' ? x - newStart.x : y - newStart.y;
-  
-    // nepovolíme pokládání „před“ start nebo s dírou za koncem slova
-    if (idx < 0) return;
-    if (idx > curWord.length) return;
-  
-    const chars = curWord.split('');
-  
-    // zarovnáme mapu na délku word
-    while (map.length < chars.length) {
-      map.push(null);
-    }
-  
-    if (idx === chars.length) {
-      // přidáváme na konec
-      chars.push(upper);
-      map.push(rackIndex ?? null);
-    } else {
-      // přepisujeme existující písmeno
-      chars[idx] = upper;
-      if (rackIndex != null) {
-        map[idx] = rackIndex;
+
+    set({ board: newBoard });
+
+    if (rackIndex != null) {
+      const { currentPlayer, hands } = get();
+      const rack = [...(hands[currentPlayer] ?? [])];
+      if (rack[rackIndex]) {
+        rack[rackIndex] = ' ';
+        set({
+          hands: {
+            ...hands,
+            [currentPlayer]: rack,
+          },
+        });
       }
     }
-  
-    set({
-      start: newStart,
-      direction: dir,
-      word: chars.join(''),
-      wordRackIndices: map,
-      error: null,
-    });
   },
-  
-  
-
-  // --- preview status pro outline a validaci ---
 
   previewStatus() {
-    const { board, start, direction, word, hands, currentPlayer } = get();
-    if (!board || !start || !word) return { ok: false };
+    const { board, word, start, direction, hands, currentPlayer } = get();
+    if (!board || !start || !word) {
+      return { ok: false, overflow: false, conflict: false, missing: [] };
+    }
 
-    const sizeY = board.length;
-    const sizeX = board[0]?.length ?? 0;
+    const w = word.toUpperCase();
+    const rows = board.length;
+    const cols = board[0]?.length ?? 0;
 
-    const endX = direction === 'row' ? start.x + word.length - 1 : start.x;
-    const endY = direction === 'col' ? start.y + word.length - 1 : start.y;
-    const overflow =
-      start.x < 0 || start.y < 0 || endX >= sizeX || endY >= sizeY;
-
+    let overflow = false;
     let conflict = false;
-    const rack = (hands[currentPlayer] ?? []).slice();
+
+    const rack = [...(hands[currentPlayer] ?? [])];
     const need: Record<string, number> = {};
 
-    for (let i = 0; i < word.length; i++) {
+    for (let i = 0; i < w.length; i++) {
+      const letter = w[i];
       const x = direction === 'row' ? start.x + i : start.x;
-      const y = direction === 'col' ? start.y + i : start.y;
-      if (x < 0 || y < 0 || x >= sizeX || y >= sizeY) continue;
+      const y = direction === 'row' ? start.y : start.y + i;
+
+      if (x < 0 || y < 0 || y >= rows || x >= cols) {
+        overflow = true;
+        continue;
+      }
 
       const onBoard = board[y][x];
-      const letter = word[i];
 
       if (onBoard !== '.' && onBoard !== letter) {
         conflict = true;
       }
 
       if (onBoard === '.') {
-        const idx = rack.indexOf(letter);
-        if (idx >= 0) rack.splice(idx, 1);
-        else need[letter] = (need[letter] ?? 0) + 1;
+        const idx = rack.findIndex((r) => r === letter);
+        if (idx >= 0) {
+          rack.splice(idx, 1);
+        } else {
+          need[letter] = (need[letter] ?? 0) + 1;
+        }
       }
     }
 

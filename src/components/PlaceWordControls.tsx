@@ -17,11 +17,19 @@ export function PlaceWordControls() {
   const appendFromKeyboard = useGameStore((s) => s.appendFromKeyboard);
   const skipTurn = useGameStore((s) => s.skipTurn);
 
-  const status = previewStatus();
-  const canSubmit = !!start && !!word && status.ok && !loading;
-  const canSkip = !loading && !word; // nechceme skip, když už skládá slovo
+  const exchanging = useGameStore((s) => s.exchanging);
+  const exchangeSelection = useGameStore((s) => s.exchangeSelection);
+  const startExchange = useGameStore((s) => s.startExchange);
+  const cancelExchange = useGameStore((s) => s.cancelExchange);
+  const confirmExchange = useGameStore((s) => s.confirmExchange);
 
-  // AUTO START POSITION = CENTER
+  const status = previewStatus();
+  const canSubmit = !exchanging && !!start && !!word && status.ok && !loading;
+  const canSkip = !loading && !word && !exchanging;
+  const canConfirmExchange =
+    exchanging && !loading && exchangeSelection.length > 0;
+
+  // Auto nastavení startovní buňky na střed
   useEffect(() => {
     if (!board || !board.length) return;
     if (start) return;
@@ -29,18 +37,22 @@ export function PlaceWordControls() {
     setStart(mid, mid);
   }, [board, start, setStart]);
 
-  // SUBMIT
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
     await place();
   };
 
-  // GLOBAL KEYBOARD UX
+  // globální klávesové zkratky
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName ?? '';
       const isInput = tag === 'INPUT' || tag === 'TEXTAREA';
+
+      // když jsme v exchange módu, ignorujeme zkratky pro pokládání
+      if (exchanging) {
+        return;
+      }
 
       // ENTER = place word
       if (e.key === 'Enter') {
@@ -100,7 +112,7 @@ export function PlaceWordControls() {
         return;
       }
 
-      // LETTERS = from rack
+      // LETTERS = add from rack by keyboard
       if (
         !isInput &&
         start &&
@@ -117,15 +129,16 @@ export function PlaceWordControls() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [
-    canSubmit,
-    place,
-    backspace,
-    setDirection,
     appendFromKeyboard,
-    start,
+    backspace,
     board,
+    canSubmit,
     direction,
+    exchanging,
+    place,
+    setDirection,
     setStart,
+    start,
   ]);
 
   const startLabel = start
@@ -172,7 +185,7 @@ export function PlaceWordControls() {
         </span>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           type="submit"
           disabled={!canSubmit}
@@ -202,6 +215,34 @@ export function PlaceWordControls() {
         >
           SKIP TURN
         </button>
+
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={exchanging ? confirmExchange : startExchange}
+          disabled={loading || (exchanging && !canConfirmExchange)}
+          className="px-3 py-2 rounded-md border border-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          title={
+            exchanging
+              ? 'Potvrdit výměnu vybraných písmen'
+              : 'Začít výměnu písmen'
+          }
+        >
+          {exchanging
+            ? `EXCHANGE (${exchangeSelection.length})`
+            : 'EXCHANGE'}
+        </button>
+
+        {exchanging && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={cancelExchange}
+            className="px-3 py-2 rounded-md border border-slate-600 text-sm"
+          >
+            CANCEL
+          </button>
+        )}
       </div>
 
       {status.overflow && (

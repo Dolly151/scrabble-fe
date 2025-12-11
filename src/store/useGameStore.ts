@@ -41,6 +41,8 @@ type GameStore = {
   start: { x: number; y: number } | null;
   direction: Direction;
   word: string;
+  // pro mapování pozic ve slově na index v racku (kvůli vracení písmen zpět)
+  wordRackIndices: (number | null)[];
 
   loadGame: (gid: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -51,13 +53,17 @@ type GameStore = {
   clear: () => void;
   place: () => Promise<void>;
 
-  // rack helpers (pro klikání v Racku)
+  // pomocné akce pro rack
   appendFromRack: (index: number) => void;
   backspaceWord: () => void;
-  shuffleRack: () => void;
 
-  // drag&drop helper
-  placeLetterPreview: (x: number, y: number, letter: string) => void;
+  // drag & drop
+  placeLetterPreview: (
+    x: number,
+    y: number,
+    letter: string,
+    rackIndex?: number,
+  ) => void;
 
   previewStatus: () => PreviewStatus;
 };
@@ -78,17 +84,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
   start: null,
   direction: 'row',
   word: '',
+  wordRackIndices: [],
 
   async loadGame(gid: string) {
     set({ loading: true, error: null, gameId: gid });
     try {
-      // layout jen jednou
       if (!get().layout) {
         const lay = await getBoardLayout();
         set({ layout: lay.board_layout });
       }
 
-      // letter values jen jednou
       if (Object.keys(get().letterValues).length === 0) {
         const vals = await getLetterValues();
         set({ letterValues: vals });
@@ -118,7 +123,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         playerNicknames[idx] = name;
       });
 
-      // výchozí start na střed desky (pokud ještě není)
       const midY = Math.floor(b.board.length / 2);
       const midX = Math.floor((b.board[0]?.length ?? 0) / 2);
       const currentStart = get().start ?? { x: midX, y: midY };
@@ -131,6 +135,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         points,
         playerNicknames,
         start: currentStart,
+        word: '',
+        wordRackIndices: [],
       });
     } catch (e: unknown) {
       set({ error: e instanceof Error ? e.message : String(e) });
@@ -168,11 +174,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   setWord(w) {
-    set({ word: w.toUpperCase() });
+    const up = w.toUpperCase();
+    set({
+      word: up,
+      // ruční psaní neví, z kterého tile je písmeno → null
+      wordRackIndices: new Array(up.length).fill(null),
+      error: null,
+    });
   },
 
   clear() {
-    set({ start: null, word: '', error: null });
+    set({ start: null, word: '', wordRackIndices: [], error: null });
   },
 
   async place() {
@@ -184,7 +196,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (res.result === 'failed') {
         set({ error: res.error_description ?? 'Invalid move' });
       } else {
-        set({ word: '', start: null });
+        set({ word: '', wordRackIndices: [], start: null });
         await get().refresh();
       }
     } catch (e: unknown) {
@@ -194,52 +206,48 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  // --- rack helpery pro klikání ---
+  // --- pomocné akce pro rack (klik + back) ---
 
   appendFromRack(index) {
-    const { currentPlayer, hands, word } = get();
+    const { currentPlayer, hands, word, wordRackIndices } = get();
     const rack = hands[currentPlayer] ?? [];
     const ch = rack[index];
     if (!ch) return;
-    set({ word: (word || '') + ch.toUpperCase(), error: null });
-  },
 
-  backspaceWord() {
-    const { word } = get();
-    if (!word) return;
-    set({ word: word.slice(0, -1), error: null });
-  },
-
-  shuffleRack() {
-    const { currentPlayer, hands } = get();
-    const rack = [...(hands[currentPlayer] ?? [])];
-    if (rack.length <= 1) return;
-
-    // Fisher–Yates shuffle
-    for (let i = rack.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rack[i], rack[j]] = [rack[j], rack[i]];
-    }
-
+    const up = ch.toUpperCase();
     set({
-      hands: {
-        ...hands,
-        [currentPlayer]: rack,
-      },
+      word: (word || '') + up,
+      wordRackIndices: [...wordRackIndices, index],
+      error: null,
     });
   },
 
-  // --- drag&drop helper (varianta B + auto row/col) ---
+  backspaceWord() {
+    const { word, wordRackIndices } = get();
+    if (!word) return;
+    set({
+      word: word.slice(0, -1),
+      wordRackIndices: wordRackIndices.slice(0, -1),
+      error: null,
+    });
+  },
 
-  placeLetterPreview(x, y, letter) {
-    const { board, start, direction, word } = get();
+  // --- drag&drop – varianta B, auto row/col, mapování na rack index ---
+
+  placeLetterPreview(x, y, letter, rackIndex) {
+    const { board, start, direction, word, wordRackIndices } = get();
     if (!board) return;
 
     const upper = letter.toUpperCase();
 
-    // 1) první písmeno – nastavíme start + první znak
+    // 1) první písmeno – nastavíme start, word i mapování
     if (!start) {
-      set({ start: { x, y }, word: upper, error: null });
+      set({
+        start: { x, y },
+        word: upper,
+        wordRackIndices: [rackIndex ?? null],
+        error: null,
+      });
       return;
     }
 
@@ -248,40 +256,51 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // 2) druhé písmeno – určujeme směr podle pozice
     if (word.length === 1) {
       if (x === start.x && y !== start.y) {
-        dir = 'col'; // stejné X → sloupec
+        dir = 'col';
       } else if (y === start.y && x !== start.x) {
-        dir = 'row'; // stejné Y → řádek
+        dir = 'row';
       } else {
-        // ani stejný řádek ani sloupec → drop ignorujeme
         return;
       }
     } else {
-      // už směr máme – musíme ho dodržet
+      // směr už máme – musíme ho dodržet
       if (dir === 'row' && y !== start.y) return;
       if (dir === 'col' && x !== start.x) return;
     }
 
-    // 3) index v řetězci (varianta B: žádné mezery / dozadu)
     const index = dir === 'row' ? x - start.x : y - start.y;
+
+    // varianta B – žádné mezery a pokládání dozadu
     if (index < 0) return;
     if (index > word.length) return;
 
     let newWord = word;
+    let newMap = [...wordRackIndices];
+
+    if (newMap.length < word.length) {
+      newMap = [...newMap, ...new Array(word.length - newMap.length).fill(null)];
+    }
+
     if (index === word.length) {
+      // přidáváme na konec
       newWord = word + upper;
+      newMap.push(rackIndex ?? null);
     } else {
+      // přepis existující pozice
       newWord = word.slice(0, index) + upper + word.slice(index + 1);
+      newMap[index] = rackIndex ?? newMap[index] ?? null;
     }
 
     set({
       start,
-      direction: dir, // auto přepnutí Row/Col v UI
+      direction: dir,
       word: newWord,
+      wordRackIndices: newMap,
       error: null,
     });
   },
 
-  // --- preview status pro outline ---
+  // --- preview status pro outline a validaci ---
 
   previewStatus() {
     const { board, start, direction, word, hands, currentPlayer } = get();

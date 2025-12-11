@@ -8,7 +8,6 @@ import { PlaceWordControls } from '@/components/PlaceWordControls';
 import { Players } from '@/components/Players';
 import { PlayerCards } from '@/components/PlayerCards';
 import { NicknameDialog } from '@/components/NicknameDialog';
-import { Rack } from '@/components/Rack';
 
 export default function GamePage() {
   const { id } = useParams<{ id: string }>();
@@ -17,30 +16,24 @@ export default function GamePage() {
   const error = useGameStore((s) => s.error);
 
   useEffect(() => {
-    if (id) {
-      // načtení hry podle ID z URL
-      loadGame(id);
-    }
+    if (id) loadGame(id);
   }, [id, loadGame]);
 
   return (
     <main className="p-4">
-      {/* dialog pro přezdívky hráčů */}
       <NicknameDialog />
 
       <h1 className="mx-auto max-w-[1400px] p-2 text-2xl font-black">
         GAME ID: {id}
       </h1>
 
-      {/* layout: vlevo deska + interaktivní rack, vpravo sidebar */}
       <div className="mx-auto grid max-w-[1400px] gap-6 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px]">
-        {/* Board + rack vlevo */}
+        {/* Levá část – deska */}
         <section className="order-2 lg:order-1 space-y-4">
           <Board />
-          <Rack />
         </section>
 
-        {/* Sidebar vpravo */}
+        {/* Pravý sidebar */}
         <aside className="order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start space-y-4">
           {error && (
             <p className="rounded-lg border border-red-700/40 bg-red-600/10 p-3 text-red-500">
@@ -48,19 +41,21 @@ export default function GamePage() {
             </p>
           )}
 
-          {/* 1) Karty hráčů (jméno + body) */}
+          {/* Karty hráčů */}
           <PlayerCards />
 
-          {/* 2) Start cell / ovládání */}
+          {/* Ovládání (Row/Col, Place Word, Back) */}
           <PlaceWordControls />
 
-          {/* 3) Racky hráčů jen pro přehled (nemají D&D) */}
+          {/* Racky hráčů (nově interaktivní jen pro current player) */}
           <Players />
         </aside>
       </div>
 
       {loading && (
-        <p className="mx-auto max-w-[1400px] p-4 text-slate-500">Načítám…</p>
+        <p className="mx-auto max-w-[1400px] p-4 text-slate-500">
+          Načítám…
+        </p>
       )}
     </main>
   );

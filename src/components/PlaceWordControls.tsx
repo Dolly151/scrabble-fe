@@ -11,6 +11,7 @@ export function PlaceWordControls() {
   const setWord = useGameStore((s) => s.setWord);
   const place = useGameStore((s) => s.place);
   const clear = useGameStore((s) => s.clear);
+  const backspace = useGameStore((s) => s.backspaceWord);
   const loading = useGameStore((s) => s.loading);
   const previewStatus = useGameStore((s) => s.previewStatus);
 
@@ -33,7 +34,8 @@ export function PlaceWordControls() {
       className="rounded-xl border p-4 bg-slate-900/40 space-y-3"
     >
       <p className="text-xs uppercase text-slate-400 mb-1">
-        START CELL: <span className="font-semibold text-slate-100">{startLabel}</span>
+        START CELL:{' '}
+        <span className="font-semibold text-slate-100">{startLabel}</span>
       </p>
 
       <div className="flex items-center gap-4 text-sm">
@@ -75,6 +77,14 @@ export function PlaceWordControls() {
         </button>
         <button
           type="button"
+          onClick={backspace}
+          className="px-3 py-2 rounded-md border border-slate-600 text-sm"
+          title="Vrátit poslední písmeno zpět do racku"
+        >
+          ⌫
+        </button>
+        <button
+          type="button"
           onClick={clear}
           className="px-4 py-2 rounded-md border border-slate-600 text-sm"
         >
@@ -82,11 +92,8 @@ export function PlaceWordControls() {
         </button>
       </div>
 
-      {/* malý hint / chyba */}
       {status.overflow && (
-        <p className="text-xs text-amber-400">
-          Slovo se nevejde na desku.
-        </p>
+        <p className="text-xs text-amber-400">Slovo se nevejde na desku.</p>
       )}
       {status.conflict && (
         <p className="text-xs text-amber-400">
@@ -98,11 +105,14 @@ export function PlaceWordControls() {
           Chybí ti dlaždice: {status.missing.join(', ')}
         </p>
       )}
-      {!status.ok && !status.overflow && !status.conflict && (!status.missing || status.missing.length === 0) && (
-        <p className="text-xs text-slate-400">
-          Vyber startovní buňku, směr a napiš slovo.
-        </p>
-      )}
+      {!status.ok &&
+        !status.overflow &&
+        !status.conflict &&
+        (!status.missing || status.missing.length === 0) && (
+          <p className="text-xs text-slate-400">
+            Vyber startovní buňku, směr a napiš / polož slovo.
+          </p>
+        )}
     </form>
   );
 }

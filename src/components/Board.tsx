@@ -47,14 +47,13 @@ export function Board() {
   if (!board) return null;
   const size = board.length;
 
-  // souřadnice políček, kam aktuálně „pokládáme“ word
-  const preview = new Set<string>();
+  const previewCoords = new Set<string>();
   if (start && word) {
     for (let i = 0; i < word.length; i++) {
       const x = direction === 'row' ? start.x + i : start.x;
       const y = direction === 'col' ? start.y + i : start.y;
       if (y >= 0 && y < size && x >= 0 && x < size) {
-        preview.add(`${x},${y}`);
+        previewCoords.add(`${x},${y}`);
       }
     }
   }
@@ -67,15 +66,18 @@ export function Board() {
       const letter =
         e.dataTransfer.getData('letter') || e.dataTransfer.getData('text/plain');
       if (!letter) return;
-      // na obsazené políčko nic nepokládáme
       if (hasLetter) return;
-      placeLetterPreview(x, y, letter);
+
+      const rackIndexStr = e.dataTransfer.getData('rackIndex');
+      const rackIndex = rackIndexStr ? Number(rackIndexStr) : undefined;
+
+      placeLetterPreview(x, y, letter, rackIndex);
     };
 
   return (
     <div className="mx-auto w-full max-w-[900px] p-4">
       <div className="grid grid-cols-[auto,1fr] grid-rows-[auto,1fr] gap-1">
-        {/* horní číslování sloupců */}
+        {/* top numbers */}
         <div className="col-start-2 row-start-1 grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1 px-3 text-xs font-bold text-white/80">
           {Array.from({ length: size }).map((_, i) => (
             <div key={`top-${i}`} className="grid place-items-center">
@@ -84,7 +86,7 @@ export function Board() {
           ))}
         </div>
 
-        {/* levé číslování řádků */}
+        {/* left numbers */}
         <div className="col-start-1 row-start-2 grid grid-rows-[repeat(15,minmax(0,1fr))] gap-1 py-3 text-xs font-bold text-white/80">
           {Array.from({ length: size }).map((_, i) => (
             <div key={`left-${i}`} className="grid place-items-center">
@@ -93,7 +95,6 @@ export function Board() {
           ))}
         </div>
 
-        {/* samotná deska */}
         <div className="col-start-2 row-start-2">
           <div className="relative aspect-square w-full">
             {error && (
@@ -112,10 +113,20 @@ export function Board() {
               {board.map((row, y) =>
                 row.map((cell, x) => {
                   const isStart = !!start && start.x === x && start.y === y;
-                  const isPreview = preview.has(`${x},${y}`);
+                  const isPreview = previewCoords.has(`${x},${y}`);
                   const prem = layout?.[y]?.[x];
                   const hasLetter = cell !== '.';
                   const centerStar = !hasLetter && x === 7 && y === 7;
+
+                  // ghost písmeno pro preview (jen na prázdných polích)
+                  let previewLetter: string | null = null;
+                  if (!hasLetter && start && isPreview && word) {
+                    const idx =
+                      direction === 'row' ? x - start.x : y - start.y;
+                    if (idx >= 0 && idx < word.length) {
+                      previewLetter = word[idx] ?? null;
+                    }
+                  }
 
                   const premiumText = (() => {
                     const n = normalizePremium(prem);
@@ -125,6 +136,11 @@ export function Board() {
                     if (n === 'DL') return 'DL';
                     return centerStar ? '★' : '';
                   })();
+
+                  const showTile = hasLetter || !!previewLetter;
+                  const tileLetter = hasLetter
+                    ? cell
+                    : previewLetter ?? '';
 
                   return (
                     <button
@@ -146,17 +162,15 @@ export function Board() {
                       ].join(' ')}
                       title={`x=${x + 1}, y=${y + 1}`}
                     >
-                      {/* prázdné pole = ukážeme prémii / hvězdičku */}
-                      {!hasLetter && premiumText && (
+                      {!showTile && premiumText && (
                         <span className="pointer-events-none select-none text-[10px] font-black tracking-wider text-slate-900/90">
                           {premiumText}
                         </span>
                       )}
 
-                      {/* písmeno na desce */}
-                      {hasLetter && (
+                      {showTile && (
                         <span className="pointer-events-none select-none rounded-[6px] bg-amber-100 px-2 py-1 text-base font-black text-slate-900 shadow-inner">
-                          {cell}
+                          {tileLetter}
                         </span>
                       )}
                     </button>

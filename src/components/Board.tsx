@@ -2,17 +2,19 @@
 
 import { useGameStore } from '@/store/useGameStore';
 
-function normalizePremium(v: unknown): 'DL' | 'TL' | 'DW' | 'TW' | null {
+type PremiumCode = 'DL' | 'TL' | 'DW' | 'TW' | null;
+
+function normalizePremium(v: unknown): PremiumCode {
   if (v == null) return null;
-  if (typeof v === 'string') {
-    const s = v.trim().toUpperCase();
-    if (s === '2C') return 'DL';
-    if (s === '3C') return 'TL';
-    if (s === '2W') return 'DW';
-    if (s === '3W') return 'TW';
-    if (s === '' || s === '  ') return null;
-    return null;
-  }
+  const s = String(v).trim().toUpperCase();
+  if (!s || s === '.' || s === '  ') return null;
+
+  // Podpora různých zápisů z backendu
+  if (s === '3W' || s === 'TW') return 'TW';
+  if (s === '2W' || s === 'DW') return 'DW';
+  if (s === '3C' || s === '3L' || s === 'TL') return 'TL';
+  if (s === '2C' || s === '2L' || s === 'DL') return 'DL';
+
   return null;
 }
 
@@ -27,6 +29,7 @@ const premiumClass = (code: unknown): string => {
     case 'DL':
       return 'bg-cyan-300';
     default:
+      // běžné pole
       return 'bg-sky-200';
   }
 };
@@ -46,7 +49,9 @@ export function Board() {
 
   if (!board) return null;
   const size = board.length;
+  const center = Math.floor(size / 2);
 
+  // souřadnice, kde se má vykreslit preview slova
   const previewCoords = new Set<string>();
   if (start && word) {
     for (let i = 0; i < word.length; i++) {
@@ -77,8 +82,13 @@ export function Board() {
   return (
     <div className="mx-auto w-full max-w-[900px] p-4">
       <div className="grid grid-cols-[auto,1fr] grid-rows-[auto,1fr] gap-1">
-        {/* top numbers */}
-        <div className="col-start-2 row-start-1 grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1 px-3 text-xs font-bold text-white/80">
+        {/* horní čísla sloupců */}
+        <div
+          className="col-start-2 row-start-1 grid gap-1 px-3 text-xs font-bold text-white/80"
+          style={{
+            gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
+          }}
+        >
           {Array.from({ length: size }).map((_, i) => (
             <div key={`top-${i}`} className="grid place-items-center">
               {i + 1}
@@ -86,8 +96,13 @@ export function Board() {
           ))}
         </div>
 
-        {/* left numbers */}
-        <div className="col-start-1 row-start-2 grid grid-rows-[repeat(15,minmax(0,1fr))] gap-1 py-3 text-xs font-bold text-white/80">
+        {/* levá čísla řádků */}
+        <div
+          className="col-start-1 row-start-2 grid gap-1 py-3 text-xs font-bold text-white/80"
+          style={{
+            gridTemplateRows: `repeat(${size}, minmax(0, 1fr))`,
+          }}
+        >
           {Array.from({ length: size }).map((_, i) => (
             <div key={`left-${i}`} className="grid place-items-center">
               {i + 1}
@@ -95,6 +110,7 @@ export function Board() {
           ))}
         </div>
 
+        {/* samotná deska */}
         <div className="col-start-2 row-start-2">
           <div className="relative aspect-square w-full">
             {error && (
@@ -106,8 +122,8 @@ export function Board() {
             <div
               className="grid h-full gap-1 rounded-xl bg-slate-900 p-3"
               style={{
-                gridTemplateColumns: `repeat(${size}, minmax(0,1fr))`,
-                gridTemplateRows: `repeat(${size}, minmax(0,1fr))`,
+                gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${size}, minmax(0, 1fr))`,
               }}
             >
               {board.map((row, y) =>
@@ -116,7 +132,7 @@ export function Board() {
                   const isPreview = previewCoords.has(`${x},${y}`);
                   const prem = layout?.[y]?.[x];
                   const hasLetter = cell !== '.';
-                  const centerStar = !hasLetter && x === 7 && y === 7;
+                  const isCenter = x === center && y === center;
 
                   // ghost písmeno pro preview (jen na prázdných polích)
                   let previewLetter: string | null = null;
@@ -129,18 +145,20 @@ export function Board() {
                   }
 
                   const premiumText = (() => {
-                    const n = normalizePremium(prem);
-                    if (n === 'TW') return 'TW';
-                    if (n === 'DW') return 'DW';
-                    if (n === 'TL') return 'TL';
-                    if (n === 'DL') return 'DL';
-                    return centerStar ? '★' : '';
+                    if (!hasLetter) {
+                      // střed = hvězda, ale barvu bere z layoutu (DW)
+                      if (isCenter) return '★';
+                      const n = normalizePremium(prem);
+                      if (n === 'TW') return 'TW';
+                      if (n === 'DW') return 'DW';
+                      if (n === 'TL') return 'TL';
+                      if (n === 'DL') return 'DL';
+                    }
+                    return '';
                   })();
 
                   const showTile = hasLetter || !!previewLetter;
-                  const tileLetter = hasLetter
-                    ? cell
-                    : previewLetter ?? '';
+                  const tileLetter = hasLetter ? cell : previewLetter ?? '';
 
                   return (
                     <button
@@ -169,7 +187,7 @@ export function Board() {
                       )}
 
                       {showTile && (
-                        <span className="pointer-events-none select-none rounded-[6px] bg-amber-100 px-2 py-1 text-base font-black text-slate-900 shadow-inner">
+                        <span className="pointer-events-none select-none rounded-md bg-yellow-100 px-2 py-1 text-base font-black text-slate-900 shadow-inner">
                           {tileLetter}
                         </span>
                       )}

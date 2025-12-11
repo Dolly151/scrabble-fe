@@ -53,9 +53,11 @@ type GameStore = {
   clear: () => void;
   place: () => Promise<void>;
 
-  // pomocné akce pro rack
-  appendFromRack: (index: number) => void;
-  backspaceWord: () => void;
+   // pomocné akce pro rack
+   appendFromRack: (index: number) => void;
+   appendFromKeyboard: (letter: string) => void;
+   backspaceWord: () => void;
+ 
 
   // drag & drop
   placeLetterPreview: (
@@ -221,6 +223,42 @@ export const useGameStore = create<GameStore>((set, get) => ({
       error: null,
     });
   },
+  appendFromKeyboard(letter) {
+    const { currentPlayer, hands, word, wordRackIndices } = get();
+    const rack = hands[currentPlayer] ?? [];
+    if (!rack.length) return;
+
+    const upper = letter.toUpperCase();
+
+    // indexy, které už jsou použité v aktuálním slově
+    const used = new Set(
+      wordRackIndices.filter(
+        (i): i is number => i !== null && i !== undefined,
+      ),
+    );
+
+    // najdeme první nepoužitou dlaždici s tímto písmenem
+    let chosenIndex = -1;
+    for (let i = 0; i < rack.length; i++) {
+      if (used.has(i)) continue;
+      if (rack[i].toUpperCase() === upper) {
+        chosenIndex = i;
+        break;
+      }
+    }
+
+    if (chosenIndex === -1) {
+      // v racku tohle písmeno nemám → nic nedělám
+      return;
+    }
+
+    set({
+      word: (word || '') + upper,
+      wordRackIndices: [...wordRackIndices, chosenIndex],
+      error: null,
+    });
+  },
+
 
   backspaceWord() {
     const { word, wordRackIndices } = get();

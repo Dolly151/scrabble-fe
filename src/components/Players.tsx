@@ -14,78 +14,72 @@ export function Players() {
 
   if (!n) return null;
 
-  const usedSet = new Set(
-    wordRackIndices.filter((i): i is number => i !== null && i !== undefined)
-  );
-
-  const handleDragStart = (
-    e: React.DragEvent<HTMLDivElement>,
-    ch: string,
-    rackIndex: number
-  ) => {
-    e.dataTransfer.setData('letter', ch);
-    e.dataTransfer.setData('rackIndex', String(rackIndex));
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
   return (
-    <div className="mx-auto max-w-[900px] p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-      {Array.from({ length: n }).map((_, i) => {
-        const rack = Array.isArray(hands[i]) ? hands[i] : [];
-        const isCurrent = i === cur;
-        const name = nicknames[i] || `Player${i + 1}`;
+    <div className="grid grid-cols-1 gap-4">
+      {Array.from({ length: n }).map((_, playerIndex) => {
+        const name = nicknames[playerIndex] || `PLAYER${playerIndex + 1}`;
+        const rack = Array.isArray(hands?.[playerIndex])
+          ? hands[playerIndex]
+          : [];
+
+        // DŮLEŽITÉ:
+        // Použité indexy (wordRackIndices) platí jen pro hráče na tahu.
+        // Pro ostatní hráče necháme usedSet prázdný.
+        const usedSet =
+          playerIndex === cur
+            ? new Set(
+                wordRackIndices.filter(
+                  (i): i is number =>
+                    i !== null && i !== undefined,
+                ),
+              )
+            : new Set<number>();
 
         return (
           <div
-            key={i}
+            key={playerIndex}
             className={[
               'rounded-xl border p-4 bg-slate-900/40',
-              isCurrent ? 'ring-2 ring-sky-400' : '',
+              playerIndex === cur ? 'ring-2 ring-sky-400' : '',
             ].join(' ')}
           >
-            <p className="font-black mb-2">{name}</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-lg font-black">{name}</p>
+              <span className="text-[11px] uppercase text-slate-400">
+                {playerIndex === cur ? 'ON TURN' : 'WAITING'}
+              </span>
+            </div>
 
             <div className="flex flex-wrap gap-2">
-              {rack.map((ch, idx) => {
+              {rack.map((ch, rackIndex) => {
                 const value = letterValues[ch] ?? 0;
-                const used = usedSet.has(idx);
+                const used = usedSet.has(rackIndex);
 
                 const tileClasses = [
-                  'relative inline-grid w-10 h-10 place-items-center rounded-md border font-black select-none text-lg',
+                  'relative inline-grid w-8 h-8 place-items-center rounded-md border font-black select-none text-sm',
                   used
                     ? 'opacity-30 cursor-not-allowed'
-                    : 'cursor-grab bg-yellow-200 shadow-inner hover:bg-yellow-300',
+                    : 'cursor-default bg-yellow-200 shadow-inner',
                   'border-yellow-700 text-slate-900',
                 ].join(' ');
 
-                if (!isCurrent) {
-                  return (
-                    <div key={idx} className={tileClasses}>
-                      {ch}
-                      <span className="absolute bottom-[2px] right-[4px] text-[10px] font-bold">
-                        {value}
-                      </span>
-                    </div>
-                  );
-                }
+                // U ostatních hráčů racky většinou nejsou interaktivní,
+                // u aktuálního hráče můžeme nechat klik přidávat písmena:
+                const interactive = playerIndex === cur && !used;
 
                 return (
                   <div
-                    key={idx}
-                    role="button"
-                    tabIndex={0}
-                    draggable={!used}
-                    onClick={used ? undefined : () => appendFromRack(idx)}
-                    onDragStart={
-                      used
-                        ? undefined
-                        : (e) => handleDragStart(e, ch, idx)
-                    }
+                    key={rackIndex}
                     className={tileClasses}
+                    onClick={
+                      interactive
+                        ? () => appendFromRack(rackIndex)
+                        : undefined
+                    }
                     title={
-                      used
-                        ? 'Už použito v aktuálním slovu'
-                        : 'Přetáhni na desku nebo klikni pro přidání'
+                      interactive
+                        ? 'Klikni pro přidání do aktuálního slova'
+                        : undefined
                     }
                   >
                     {ch}

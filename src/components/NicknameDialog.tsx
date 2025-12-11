@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState, useRef } from 'react';
+import { FormEvent, useRef } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 
 export function NicknameDialog() {
@@ -9,56 +9,49 @@ export function NicknameDialog() {
   const nicknames = useGameStore((s) => s.playerNicknames);
   const setNickname = useGameStore((s) => s.setNickname);
 
-  // lokální stav průvodce nicků pro aktuální hru
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [finished, setFinished] = useState(false);
-
-  // ref na input
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // bez hry nebo hráčů → nic nezobrazujeme
   if (!gameId || !nPlayers) return null;
 
-  // pokud už jsme průvodce pro tuhle hru dokončili
-  if (finished) return null;
+  // poskládáme si seznam přezdívek pro hráče 0..nPlayers-1
+  const nicknameList = Array.from({ length: nPlayers }, (_, i) => {
+    const raw = nicknames[i];
+    return (raw ?? '').trim();
+  });
 
-  // ochrana – kdyby currentIdx „přeskočil“ počet hráčů
-  if (currentIdx >= nPlayers) {
-    return null;
-  }
+  // najdeme prvního hráče bez přezdívky
+  const missingIndex = nicknameList.findIndex((n) => n.length === 0);
 
-  const defaultValue = `Player${currentIdx + 1}`;
+  // všichni mají přezdívku → dialog vůbec nerenderujeme
+  if (missingIndex === -1) return null;
 
+  const defaultValue = `Player${missingIndex + 1}`;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const raw = inputRef.current?.value ?? '';
     const value = raw.trim() || defaultValue;
 
-    await setNickname(currentIdx, value);
-
-    if (currentIdx + 1 < nPlayers) {
-      // další hráč
-      setCurrentIdx(currentIdx + 1);
-    } else {
-      // poslední hráč → průvodce hotový
-      setFinished(true);
-    }
+    await setNickname(missingIndex, value);
+    // po uložení se store aktualizuje, komponenta se znovu vyrenderuje,
+    // missingIndex se přepočítá na dalšího hráče bez nicku
+    // nebo na -1 → dialog zmizí
   };
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60">
       <form
-        key={`${gameId}-${currentIdx}`}
+        key={`${gameId}-${missingIndex}`}
         onSubmit={handleSubmit}
         className="bg-slate-900 text-white rounded-2xl shadow-xl p-6 w-full max-w-sm border border-slate-700"
       >
         <h2 className="text-xl font-bold mb-4">
-          Přezdívka hráče {currentIdx + 1}
+          Přezdívka hráče {missingIndex + 1}
         </h2>
         <p className="text-sm text-slate-300 mb-3">
-          Nech <span className="font-mono">Player{currentIdx + 1}</span> nebo
-          zadej vlastní přezdívku.
+          Nech <span className="font-mono">{defaultValue}</span> nebo zadej
+          vlastní přezdívku.
         </p>
         <input
           ref={inputRef}

@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent } from 'react';
+import { FormEvent, useEffect } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 
 export function PlaceWordControls() {
@@ -23,6 +23,31 @@ export function PlaceWordControls() {
     if (!canSubmit) return;
     await place();
   };
+
+  // Globální Enter: funguje i když není fokus v inputu
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+
+      const target = e.target as HTMLElement | null;
+      // Pokud píšu přímo do inputu / textarea / tlačítka, necháme klasický submit
+      if (
+        target &&
+        ['INPUT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)
+      ) {
+        return;
+      }
+
+      if (!canSubmit) return;
+
+      e.preventDefault();
+      void place();
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [canSubmit, place]);
 
   const startLabel = start
     ? `${start.x + 1}, ${start.y + 1}`

@@ -237,68 +237,92 @@ export const useGameStore = create<GameStore>((set, get) => ({
   placeLetterPreview(x, y, letter, rackIndex) {
     const { board, start, direction, word, wordRackIndices } = get();
     if (!board) return;
-
+  
     const upper = letter.toUpperCase();
+  
+    // zkopírujeme si současný stav
+    let newStart = start ?? null;  // tohle klidně může zůstat s null
+    let dir = direction as 'row' | 'col' | undefined;
+    let curWord = word ?? '';
+    let map = wordRackIndices ? [...wordRackIndices] : [];
 
-    // 1) první písmeno – nastavíme start, word i mapování
-    if (!start) {
+  
+    // 1) PRVNÍ PÍSMENO – nový náhled, reset direction
+    if (!curWord) {
+      newStart = { x, y };
+      curWord = upper;
+      map = [rackIndex ?? null];
+    
       set({
-        start: { x, y },
-        word: upper,
-        wordRackIndices: [rackIndex ?? null],
+        start: newStart,
+        direction: undefined,   // ← klíčová změna
+        word: curWord,
+        wordRackIndices: map,
         error: null,
       });
+      
       return;
     }
-
-    let dir = direction;
-
-    // 2) druhé písmeno – určujeme směr podle pozice
-    if (word.length === 1) {
-      if (x === start.x && y !== start.y) {
+    
+  
+    // pro jistotu – pokud máme word, ale nemáme start, vezmeme aktuální pole jako start
+    if (!newStart) {
+      newStart = { x, y };
+    }
+  
+    // 2) URČENÍ / KONTROLA SMĚRU
+    if (!dir) {
+      // jsme u druhého písmena – určujeme směr podle pozice
+      if (x === newStart.x && y !== newStart.y) {
         dir = 'col';
-      } else if (y === start.y && x !== start.x) {
+      } else if (y === newStart.y && x !== newStart.x) {
         dir = 'row';
       } else {
+        // stejné pole nebo diagonála – nedává směr, ignorujeme
         return;
       }
     } else {
-      // směr už máme – musíme ho dodržet
-      if (dir === 'row' && y !== start.y) return;
-      if (dir === 'col' && x !== start.x) return;
+      // směr už je daný, musíme ho respektovat
+      if (dir === 'row' && y !== newStart.y) return;
+      if (dir === 'col' && x !== newStart.x) return;
     }
-
-    const index = dir === 'row' ? x - start.x : y - start.y;
-
-    // varianta B – žádné mezery a pokládání dozadu
-    if (index < 0) return;
-    if (index > word.length) return;
-
-    let newWord = word;
-    let newMap = [...wordRackIndices];
-
-    if (newMap.length < word.length) {
-      newMap = [...newMap, ...new Array(word.length - newMap.length).fill(null)];
+  
+    // 3) INDEX VE SLOVĚ podle směru
+    const idx = dir === 'row' ? x - newStart.x : y - newStart.y;
+  
+    // nepovolíme pokládání „před“ start nebo s dírou za koncem slova
+    if (idx < 0) return;
+    if (idx > curWord.length) return;
+  
+    const chars = curWord.split('');
+  
+    // zarovnáme mapu na délku word
+    while (map.length < chars.length) {
+      map.push(null);
     }
-
-    if (index === word.length) {
+  
+    if (idx === chars.length) {
       // přidáváme na konec
-      newWord = word + upper;
-      newMap.push(rackIndex ?? null);
+      chars.push(upper);
+      map.push(rackIndex ?? null);
     } else {
-      // přepis existující pozice
-      newWord = word.slice(0, index) + upper + word.slice(index + 1);
-      newMap[index] = rackIndex ?? newMap[index] ?? null;
+      // přepisujeme existující písmeno
+      chars[idx] = upper;
+      if (rackIndex != null) {
+        map[idx] = rackIndex;
+      }
     }
-
+  
     set({
-      start,
+      start: newStart,
       direction: dir,
-      word: newWord,
-      wordRackIndices: newMap,
+      word: chars.join(''),
+      wordRackIndices: map,
       error: null,
     });
   },
+  
+  
 
   // --- preview status pro outline a validaci ---
 

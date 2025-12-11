@@ -9,6 +9,7 @@ export function Rack() {
   const wordRackIndices = useGameStore((s) => s.wordRackIndices);
   const appendFromRack = useGameStore((s) => s.appendFromRack);
   const letterValues = useGameStore((s) => s.letterValues);
+  const playerNicknames = useGameStore((s) => s.playerNicknames);
 
   const rack = Array.isArray(hands?.[cur]) ? hands[cur] : [];
 
@@ -28,11 +29,14 @@ export function Rack() {
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  const name =
+    (playerNicknames && playerNicknames[cur]) || `PLAYER ${cur + 1}`;
+
   return (
     <div className="mx-auto max-w-[900px] p-4">
       <div className="rounded-xl border bg-slate-900/40 px-4 py-3">
         <p className="text-xs uppercase text-slate-400 mb-2">
-          RACK: CURRENT PLAYER
+          RACK: <span className="font-semibold text-slate-100">{name}</span>
         </p>
         <div className="flex flex-wrap gap-2">
           {rack.map((ch, idx) => {
@@ -55,9 +59,7 @@ export function Rack() {
                 draggable={!used}
                 onClick={used ? undefined : () => appendFromRack(idx)}
                 onDragStart={
-                  used
-                    ? undefined
-                    : (e) => handleDragStart(e, ch, idx)
+                  used ? undefined : (e) => handleDragStart(e, ch, idx)
                 }
                 className={tileClasses}
                 title={

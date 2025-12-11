@@ -15,9 +15,11 @@ export function PlaceWordControls() {
   const previewStatus = useGameStore((s) => s.previewStatus);
   const board = useGameStore((s) => s.board);
   const appendFromKeyboard = useGameStore((s) => s.appendFromKeyboard);
+  const skipTurn = useGameStore((s) => s.skipTurn);
 
   const status = previewStatus();
   const canSubmit = !!start && !!word && status.ok && !loading;
+  const canSkip = !loading && !word; // nechceme skip, když už skládá slovo
 
   // AUTO START POSITION = CENTER
   useEffect(() => {
@@ -188,6 +190,17 @@ export function PlaceWordControls() {
           title="Vrátit poslední písmeno zpět"
         >
           ⌫
+        </button>
+
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={skipTurn}
+          disabled={!canSkip}
+          className="px-3 py-2 rounded-md border border-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Přeskočit tah bez položení slova"
+        >
+          SKIP TURN
         </button>
       </div>
 

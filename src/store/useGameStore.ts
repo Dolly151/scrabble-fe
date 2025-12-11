@@ -12,6 +12,7 @@ import {
   setPlayerNickname,
   getAllPlayerPoints,
   getLetterValues,
+  skipTurn,
 } from '@/lib/api';
 
 type Direction = 'row' | 'col';
@@ -52,6 +53,7 @@ type GameStore = {
   setWord: (w: string) => void;
   clear: () => void;
   place: () => Promise<void>;
+  skipTurn: () => Promise<void>;
 
    // pomocné akce pro rack
    appendFromRack: (index: number) => void;
@@ -207,6 +209,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ loading: false });
     }
   },
+  async skipTurn() {
+    const { gameId } = get();
+    if (!gameId) return;
+
+    // při skipu chceme vyčistit případné rozpracované slovo
+    set({
+      loading: true,
+      error: null,
+      word: '',
+      wordRackIndices: [],
+      start: null,
+    });
+
+    try {
+      const res = await skipTurn(gameId);
+      if (res.result === 'failed') {
+        set({ error: res.error_description ?? 'Skip failed' });
+      } else {
+        await get().refresh();
+      }
+    } catch (e: unknown) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
 
   // --- pomocné akce pro rack (klik + back) ---
 

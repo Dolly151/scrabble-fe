@@ -436,36 +436,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   placeLetterPreview(x, y, letter, rackIndex) {
-    const { board } = get();
-    if (!board) return;
-
-    const rows = board.length;
-    const cols = board[0]?.length ?? 0;
-
-    if (x < 0 || y < 0 || y >= rows || x >= cols) return;
-
-    const newBoard = board.map((row) => [...row]);
-
-    if (newBoard[y][x] === ".") {
-      newBoard[y][x] = letter.toUpperCase();
-    }
-
-    set({ board: newBoard });
-
+    // Záměrně NEMĚNÍME board ani hands.
+    // Chceme používat stejný model jako klávesnice/klik: start + word + wordRackIndices.
+    get().setStart(x, y);
+  
     if (rackIndex != null) {
-      const { currentPlayer, hands } = get();
-      const rack = [...(hands[currentPlayer] ?? [])];
-      if (rack[rackIndex]) {
-        rack[rackIndex] = " ";
-        set({
-          hands: {
-            ...hands,
-            [currentPlayer]: rack,
-          },
-        });
-      }
+      get().appendFromRack(rackIndex);
+    } else {
+      get().appendFromKeyboard(letter);
     }
   },
+  
 
   previewStatus() {
     const { board, word, start, direction, hands, currentPlayer } = get();

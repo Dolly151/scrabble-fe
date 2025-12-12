@@ -1,6 +1,6 @@
 // src/store/useGameStore.ts
-import { create } from 'zustand';
-import type { Board } from '@/types/api';
+import { create } from "zustand";
+import type { Board } from "@/types/api";
 import {
   getBoard,
   getBoardLayout,
@@ -14,9 +14,9 @@ import {
   getLetterValues,
   skipTurn,
   replaceLetters,
-} from '@/lib/api';
+} from "@/lib/api";
 
-type Direction = 'row' | 'col';
+type Direction = "row" | "col";
 
 type PreviewStatus = {
   ok: boolean;
@@ -73,7 +73,7 @@ type GameStore = {
     x: number,
     y: number,
     letter: string,
-    rackIndex?: number,
+    rackIndex?: number
   ) => void;
 
   previewStatus: () => PreviewStatus;
@@ -81,19 +81,16 @@ type GameStore = {
 
 // type-guard: jestli odpověď z API má pole `letter_values`
 function hasLetterValuesField(
-  obj: unknown,
+  obj: unknown
 ): obj is { letter_values: Record<string, number> } {
-  if (
-    typeof obj === 'object' &&
-    obj !== null &&
-    'letter_values' in obj
-  ) {
-    const lv = (obj as Record<string, unknown>)['letter_values'];
-    return typeof lv === 'object' && lv !== null;
+  if (typeof obj === "object" && obj !== null && "letter_values" in obj) {
+    const lv = (obj as Record<string, unknown>)["letter_values"];
+    return typeof lv === "object" && lv !== null;
   }
   return false;
 }
 
+const nickDoneKey = (gid: string) => `scrabble:nicknames_done:${gid}`;
 
 export const useGameStore = create<GameStore>((set, get) => ({
   gameId: undefined,
@@ -110,8 +107,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playerNicknames: {},
 
   start: null,
-  direction: 'row',
-  word: '',
+  direction: "row",
+  word: "",
   wordRackIndices: [],
 
   exchanging: false,
@@ -125,6 +122,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({ layout: lay.board_layout });
       }
 
+      const done =
+        typeof window !== "undefined" &&
+        !!localStorage.getItem(nickDoneKey(gid));
+
       const [b, n, cur, pointsResp, letterValuesResp, nicksResp] =
         await Promise.all([
           getBoard(gid),
@@ -132,7 +133,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           getCurrentPlayer(gid),
           getAllPlayerPoints(gid),
           getLetterValues(),
-          getPlayerNicknames(gid),
+          done ? getPlayerNicknames(gid) : Promise.resolve(null),
         ]);
 
       // ruce hráčů
@@ -148,11 +149,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         points[idx] = p;
       });
 
-      // přezdívky
+      // přezdívky: záměrně nenačítáme z backendu, aby se nepropsala random jména
+      // Dialog si je vyžádá a setNickname je uloží do backendu.
       const playerNicknames: Record<number, string> = {};
-      nicksResp.player_nicknames.forEach((name, idx) => {
-        playerNicknames[idx] = name;
-      });
+
+      if (done && nicksResp) {
+        nicksResp.player_nicknames.forEach((name, idx) => {
+          playerNicknames[idx] = name;
+        });
+      }
+      // když done=false → zůstane prázdné {}, takže NicknameDialog poběží
 
       // hodnoty písmen – přijmeme obě varianty:
       // 1) { letter_values: { A: 1, B: 3, ... } }
@@ -195,20 +201,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  async setNickname(playerIndex, nickname) {
+  async setNickname(playerIndex: number, nickname: string) {
     const gid = get().gameId;
     if (!gid) return;
-
+  
     const finalName = nickname.trim() || `Player${playerIndex + 1}`;
     await setPlayerNickname(gid, playerIndex, finalName);
-
-    set((state) => ({
-      playerNicknames: {
+  
+    set((state) => {
+      const next = {
         ...state.playerNicknames,
         [playerIndex]: finalName,
-      },
-    }));
+      };
+  
+      // pokud už jsou všechny přezdívky vyplněné, označíme hru jako "hotovo"
+      const allFilled = Array.from({ length: state.nPlayers }, (_, i) =>
+        (next[i] ?? '').trim()
+      ).every((v) => v.length > 0);
+  
+      if (allFilled && typeof window !== 'undefined' && state.gameId) {
+        localStorage.setItem(nickDoneKey(state.gameId), '1');
+      }
+  
+      return { playerNicknames: next };
+    });
   },
+  
+    
 
   setStart(x, y) {
     set({ start: { x, y }, error: null });
@@ -230,7 +249,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   clear() {
     set({
       start: null,
-      word: '',
+      word: "",
       wordRackIndices: [],
       error: null,
     });
@@ -242,10 +261,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const res = await placeWord(gameId, start.x, start.y, word, direction);
-      if (res.result === 'failed') {
-        set({ error: res.error_description ?? 'Invalid move' });
+      if (res.result === "failed") {
+        set({ error: res.error_description ?? "Invalid move" });
       } else {
-        set({ word: '', wordRackIndices: [], start: null });
+        set({ word: "", wordRackIndices: [], start: null });
         await get().refresh();
       }
     } catch (e) {
@@ -264,15 +283,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       loading: true,
       error: null,
-      word: '',
+      word: "",
       wordRackIndices: [],
       start: null,
     });
 
     try {
       const res = await skipTurn(gameId);
-      if (res.result === 'failed') {
-        set({ error: res.error_description ?? 'Skip failed' });
+      if (res.result === "failed") {
+        set({ error: res.error_description ?? "Skip failed" });
       } else {
         await get().refresh();
       }
@@ -324,8 +343,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const rack = hands[currentPlayer] ?? [];
     const letters = exchangeSelection
       .map((i) => rack[i])
-      .filter((ch) => typeof ch === 'string')
-      .join('');
+      .filter((ch) => typeof ch === "string")
+      .join("");
 
     if (!letters) return;
 
@@ -333,13 +352,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     try {
       const res = await replaceLetters(gameId, letters);
-      if (res.result === 'failed') {
+      if (res.result === "failed") {
         set({
-          error: res.error_description ?? 'Exchange failed',
+          error: res.error_description ?? "Exchange failed",
         });
       } else {
         set({
-          word: '',
+          word: "",
           wordRackIndices: [],
           start: null,
           exchanging: false,
@@ -368,7 +387,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const up = ch.toUpperCase();
     set({
-      word: (word || '') + up,
+      word: (word || "") + up,
       wordRackIndices: [...wordRackIndices, index],
       error: null,
     });
@@ -384,9 +403,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const upper = letter.toUpperCase();
 
     const used = new Set(
-      wordRackIndices.filter(
-        (i): i is number => i !== null && i !== undefined,
-      ),
+      wordRackIndices.filter((i): i is number => i !== null && i !== undefined)
     );
 
     let chosenIndex = -1;
@@ -401,7 +418,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (chosenIndex === -1) return;
 
     set({
-      word: (word || '') + upper,
+      word: (word || "") + upper,
       wordRackIndices: [...wordRackIndices, chosenIndex],
       error: null,
     });
@@ -429,7 +446,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const newBoard = board.map((row) => [...row]);
 
-    if (newBoard[y][x] === '.') {
+    if (newBoard[y][x] === ".") {
       newBoard[y][x] = letter.toUpperCase();
     }
 
@@ -439,7 +456,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const { currentPlayer, hands } = get();
       const rack = [...(hands[currentPlayer] ?? [])];
       if (rack[rackIndex]) {
-        rack[rackIndex] = ' ';
+        rack[rackIndex] = " ";
         set({
           hands: {
             ...hands,
@@ -468,8 +485,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     for (let i = 0; i < w.length; i++) {
       const letter = w[i];
-      const x = direction === 'row' ? start.x + i : start.x;
-      const y = direction === 'row' ? start.y : start.y + i;
+      const x = direction === "row" ? start.x + i : start.x;
+      const y = direction === "row" ? start.y : start.y + i;
 
       if (x < 0 || y < 0 || y >= rows || x >= cols) {
         overflow = true;
@@ -478,11 +495,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const onBoard = board[y][x];
 
-      if (onBoard !== '.' && onBoard !== letter) {
+      if (onBoard !== "." && onBoard !== letter) {
         conflict = true;
       }
 
-      if (onBoard === '.') {
+      if (onBoard === ".") {
         const idx = rack.findIndex((r) => r === letter);
         if (idx >= 0) {
           rack.splice(idx, 1);

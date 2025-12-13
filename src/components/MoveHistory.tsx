@@ -58,7 +58,6 @@ export function MoveHistory({ compact = false }: { compact?: boolean }) {
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-slate-950/80">
             <tr className="text-slate-300">
-              <th className="py-2 pr-2 text-left">Time</th>
               <th className="py-2 pr-2 text-left">Player</th>
               <th className="py-2 pr-2 text-left">Action</th>
               <th className="py-2 pr-2 text-left">Detail</th>
@@ -78,7 +77,7 @@ export function MoveHistory({ compact = false }: { compact?: boolean }) {
               let points: number | null = null;
 
               if (isWordPlacement(event)) {
-                detail = `${event.word} @ ${event.x + 1},${event.y + 1} ${dirArrow(
+                detail = `${event.word} [${event.x + 1},${event.y + 1}] ${dirArrow(
                   event.direction
                 )}`;
                 points = event.points ?? null;
@@ -93,9 +92,6 @@ export function MoveHistory({ compact = false }: { compact?: boolean }) {
                   key={event.event_id}
                   className="border-t border-slate-800/60"
                 >
-                  <td className="py-2 pr-2 text-slate-400">
-                    {event.time_human?.slice(11, 19) ?? '—'}
-                  </td>
                   <td className="py-2 pr-2">{player}</td>
                   <td className="py-2 pr-2 uppercase text-slate-300">
                     {event.type.replaceAll('_', ' ')}

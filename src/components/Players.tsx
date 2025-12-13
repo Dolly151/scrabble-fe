@@ -64,7 +64,7 @@ export function Players() {
             key={i}
             className={[
               'rounded-xl border p-4 bg-slate-900/40',
-              cur === i ? 'ring-2 ring-sky-400' : '',
+              cur === i ? 'ring-4 ring-sky-400 bg-slate-800/60 shadow-lg scale-[1.02] font-extrabold text-white ' : '',
             ].join(' ')}
           >
             <div className="flex items-center justify-between mb-2">

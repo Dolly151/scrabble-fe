@@ -193,7 +193,6 @@ export function Board() {
                       (x === cx - 2 && y === cy + 2) ||
                       (x === cx + 2 && y === cy - 2);
 
-                    // Ty, které jsi ukázal: (10,6) a (6,10) => (x=cx+2,y=cy-2) a (x=cx-2,y=cy+2)
                     const shouldBeTL = isTLDiagonal2Other;
 
                     if (shouldBeTL && normalizePremium(prem) === "DW") {
@@ -241,7 +240,10 @@ export function Board() {
                       className={[
                         "relative grid place-items-center rounded-md border transition-transform active:scale-95",
                         isStart
-                          ? "ring-2 ring-sky-500 border-sky-600"
+                          ? [
+                              "ring-4 ring-amber-400",
+                              "border-amber-500",
+                            ].join(" ")
                           : "border-slate-700",
 
                         isCenter

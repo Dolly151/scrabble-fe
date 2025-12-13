@@ -1,13 +1,30 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { newGame } from '@/lib/api';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { newGame } from "@/lib/api";
+
+function TitleTile({ children }: { children: string }) {
+  return (
+    <div
+      className="
+        flex h-12 w-12 items-center justify-center
+        rounded-lg
+        bg-[#4FB6E8]
+        text-[22px] font-extrabold
+        text-white
+        shadow-[inset_0_-3px_0_rgba(0,0,0,0.25)]
+      "
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function StartPage() {
   const router = useRouter();
   const [players, setPlayers] = useState(2);
-  const [gid, setGid] = useState('');
+  const [gid, setGid] = useState("");
   const [loading, setLoading] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -20,7 +37,7 @@ export default function StartPage() {
       router.push(`/game/${game_id}`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setCreateErr(msg || 'Create failed');
+      setCreateErr(msg || "Create failed");
     } finally {
       setLoading(false);
     }
@@ -29,7 +46,7 @@ export default function StartPage() {
   function onLoad() {
     const id = gid.trim();
     if (!id) {
-      setLoadErr('Please enter a GAME ID');
+      setLoadErr("Please enter a GAME ID");
       return;
     }
     setLoadErr(null);
@@ -38,23 +55,46 @@ export default function StartPage() {
 
   return (
     <main className="mx-auto max-w-md space-y-6 p-6">
-      <h1 className="text-3xl font-black tracking-wide text-white">
-        SCRABBLE
-      </h1>
+      <header className="flex flex-col items-center gap-2">
+        {/* SCRABBLE */}
+        <div className="flex gap-[6px]">
+          {"SCRABBLE".split("").map((ch, i) => (
+            <TitleTile key={i}>{ch}</TitleTile>
+          ))}
+        </div>
+
+        {/* BY DOLLY */}
+        <div className="flex gap-1">
+          {"BY DOLLY".split("").map((ch, i) =>
+            ch === " " ? (
+              <div key={i} className="w-4" />
+            ) : (
+              <div
+                key={i}
+                className="
+            flex h-8 w-8 items-center justify-center
+            rounded-md
+            bg-slate-700
+            text-[12px] font-bold tracking-wide
+            text-slate-100
+          "
+              >
+                {ch}
+              </div>
+            )
+          )}
+        </div>
+      </header>
 
       {/* Number of players */}
       <label className="block space-y-1">
-        <span className="text-sm text-slate-300">
-          Number of players
-        </span>
+        <span className="text-sm text-slate-300">Number of players</span>
         <input
           type="number"
           min={2}
           max={4}
           value={players}
-          onChange={(e) =>
-            setPlayers(parseInt(e.target.value || '2', 10))
-          }
+          onChange={(e) => setPlayers(parseInt(e.target.value || "2", 10))}
           className="
             w-full rounded-md border border-slate-700
             bg-slate-900 px-3 py-2
@@ -78,9 +118,7 @@ export default function StartPage() {
       >
         CREATE GAME
       </button>
-      {createErr && (
-        <p className="text-sm text-red-500">{createErr}</p>
-      )}
+      {createErr && <p className="text-sm text-red-500">{createErr}</p>}
 
       {/* Load game */}
       <div className="flex items-center gap-2">
@@ -113,9 +151,7 @@ export default function StartPage() {
           LOAD
         </button>
       </div>
-      {loadErr && (
-        <p className="text-sm text-red-500">{loadErr}</p>
-      )}
+      {loadErr && <p className="text-sm text-red-500">{loadErr}</p>}
 
       <p className="text-xs text-slate-500">
         BE: {process.env.NEXT_PUBLIC_API_URL}

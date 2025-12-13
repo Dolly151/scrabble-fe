@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { useGameStore } from '@/store/useGameStore';
+import React from "react";
+import { useGameStore } from "@/store/useGameStore";
+import { MoveHistory } from "@/components/MoveHistory";
 
 export function Rack() {
   const cur = useGameStore((s) => s.currentPlayer);
@@ -21,9 +22,7 @@ export function Rack() {
 
   // dlaždice, které už jsou použité v aktuálním slově
   const usedSet = new Set(
-    wordRackIndices.filter(
-      (i): i is number => i !== null && i !== undefined,
-    ),
+    wordRackIndices.filter((i): i is number => i !== null && i !== undefined)
   );
   // dlaždice vybrané k výměně
   const selectedSet = new Set(exchangeSelection);
@@ -31,12 +30,12 @@ export function Rack() {
   const handleDragStart = (
     e: React.DragEvent<HTMLDivElement>,
     ch: string,
-    rackIndex: number,
+    rackIndex: number
   ) => {
     if (exchanging) return; // v režimu výměny nedraggujeme
-    e.dataTransfer.setData('letter', ch);
-    e.dataTransfer.setData('rackIndex', String(rackIndex));
-    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData("letter", ch);
+    e.dataTransfer.setData("rackIndex", String(rackIndex));
+    e.dataTransfer.effectAllowed = "move";
   };
 
   const name = playerNicknames[cur] || `PLAYER ${cur + 1}`;
@@ -45,8 +44,7 @@ export function Rack() {
     <div className="mx-auto max-w-[900px] p-4">
       <div className="rounded-xl border bg-slate-900/40 px-4 py-3">
         <p className="text-xs uppercase text-slate-400 mb-2">
-          RACK:{' '}
-          <span className="font-semibold text-slate-100">{name}</span>
+          RACK: <span className="font-semibold text-slate-100">{name}</span>
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -56,15 +54,17 @@ export function Rack() {
             const selected = selectedSet.has(idx);
 
             const tileClasses = [
-              'relative inline-grid w-10 h-10 place-items-center rounded-md border font-black select-none text-lg',
+              "relative inline-grid w-10 h-10 place-items-center rounded-md border font-black select-none text-lg",
               used
-                ? 'opacity-30 cursor-not-allowed'
-                : 'bg-yellow-200 shadow-inner hover:bg-yellow-300',
-              exchanging && !selected ? 'cursor-pointer' : '',
-              exchanging && selected ? 'cursor-pointer ring-2 ring-sky-400' : '',
-              !exchanging && !used ? 'cursor-grab' : '',
-              'border-yellow-700 text-slate-900',
-            ].join(' ');
+                ? "opacity-30 cursor-not-allowed"
+                : "bg-yellow-200 shadow-inner hover:bg-yellow-300",
+              exchanging && !selected ? "cursor-pointer" : "",
+              exchanging && selected
+                ? "cursor-pointer ring-2 ring-sky-400"
+                : "",
+              !exchanging && !used ? "cursor-grab" : "",
+              "border-yellow-700 text-slate-900",
+            ].join(" ");
 
             const handleClick = () => {
               if (exchanging) {
@@ -92,11 +92,11 @@ export function Rack() {
                 title={
                   exchanging
                     ? selected
-                      ? 'Odebrat z výměny'
-                      : 'Přidat do výměny'
+                      ? "Odebrat z výměny"
+                      : "Přidat do výměny"
                     : used
-                    ? 'Už použito v aktuálním slovu'
-                    : 'Přetáhni na desku nebo klikni pro přidání'
+                    ? "Už použito v aktuálním slovu"
+                    : "Přetáhni na desku nebo klikni pro přidání"
                 }
               >
                 {ch}
@@ -107,6 +107,10 @@ export function Rack() {
             );
           })}
         </div>
+      </div>
+      {/* historie tahů – pod rackem aktuálního hráče */}
+      <div className="mt-3">
+        <MoveHistory compact />
       </div>
     </div>
   );

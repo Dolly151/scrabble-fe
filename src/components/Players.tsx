@@ -2,6 +2,7 @@
 
 import { useGameStore } from '@/store/useGameStore';
 
+
 function GhostRackTile({
   letter,
   value,
@@ -87,7 +88,7 @@ export function Players() {
                 </div>
               </div>
 
-              <span className="text-[11px] uppercase text-slate-400">
+              <span className="text-[13px] uppercase text-slate-400">
                 {cur === i ? 'ON TURN' : 'WAITING'}
               </span>
             </div>

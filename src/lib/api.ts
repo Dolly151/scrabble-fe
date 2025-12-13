@@ -131,3 +131,10 @@ export async function skipTurn(
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+// ---- log / history ----
+export async function getLog(gid: string) {
+  const r = await fetch(`${BASE}/g/${gid}/log`, { cache: 'no-store' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<import('@/types/api').LogResp>;
+}

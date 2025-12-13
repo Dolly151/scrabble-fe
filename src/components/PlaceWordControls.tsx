@@ -180,8 +180,8 @@ export function PlaceWordControls() {
           Col (↓)
         </label>
 
-        <span className="text-[11px] text-slate-400">
-          Šipky = pohyb, mezerník = směr, písmena = přidání, Backspace = undo
+        <span className="text-[12px] text-slate-400">
+          arrows = movement, spacebar = direction, letters = add them to board by press them or use drag&drop, backspace = undo
         </span>
       </div>
 

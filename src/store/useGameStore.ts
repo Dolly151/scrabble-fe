@@ -1,6 +1,8 @@
 // src/store/useGameStore.ts
 import { create } from "zustand";
 import type { Board } from "@/types/api";
+import type { LogEvent } from '@/types/api';
+import { getLog } from '@/lib/api';
 import {
   getBoard,
   getBoardLayout,
@@ -35,6 +37,8 @@ type GameStore = {
   points: Record<number, number>;
   loading: boolean;
   error?: string | null;
+
+  log: LogEvent[];
 
   letterValues: Record<string, number>;
   playerNicknames: Record<number, string>;
@@ -103,6 +107,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   loading: false,
   error: null,
 
+  log: [],
+
   letterValues: {},
   playerNicknames: {},
 
@@ -126,7 +132,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         typeof window !== "undefined" &&
         !!localStorage.getItem(nickDoneKey(gid));
 
-      const [b, n, cur, pointsResp, letterValuesResp, nicksResp] =
+        const [b, n, cur, pointsResp, letterValuesResp, nicksResp, logResp] =
         await Promise.all([
           getBoard(gid),
           getNumPlayers(gid),
@@ -134,7 +140,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           getAllPlayerPoints(gid),
           getLetterValues(),
           done ? getPlayerNicknames(gid) : Promise.resolve(null),
-        ]);
+          getLog(gid),
+        ]);      
 
       // ruce hráčů
       const hands: Record<number, string[]> = {};
@@ -184,6 +191,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         letterValues,
         playerNicknames,
         start: currentStart,
+        log: logResp.log,
       });
     } catch (e) {
       set({

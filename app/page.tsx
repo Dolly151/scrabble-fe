@@ -1,161 +1,128 @@
-"use client";
+/*
+ *  ###################
+ *  #                 #
+ *  #   #####         #
+ *  #        ######   #
+ *  #        ##       #
+ *  #        ##       #
+ *  #        ##       #
+ *  #        ##       #
+ *  #                 #
+ *  ###################
+ *
+ * Faculty of Information Technologies
+ * Brno University of Technology
+ * User Interface Programming (ITU)
+ *
+ * File: app/page.tsx
+ *
+ * Description:
+ *  Entry (landing) page of the Scrabble application.
+ *  Serves as the main entry point for the user, allowing them to:
+ *   - create a new game
+ *   - load an existing game
+ *   - navigate to the game page at /game/[id]
+ *
+ *  This page does not implement game logic itself;
+ *  it only initializes and transitions the user into the game.
+ *
+ * Author: Filip Dolezal, xdolezf00, 250073
+ * Date: Autumn 2025
+ */
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { newGame } from "@/lib/api";
+'use client';
 
-function TitleTile({ children }: { children: string }) {
-  return (
-    <div
-      className="
-        flex h-12 w-12 items-center justify-center
-        rounded-lg
-        bg-[#4FB6E8]
-        text-[22px] font-extrabold
-        text-white
-        shadow-[inset_0_-3px_0_rgba(0,0,0,0.25)]
-      "
-    >
-      {children}
-    </div>
-  );
-}
+/*
+ * This page is a client component because it:
+ *  - reacts to user actions (Create / Load)
+ *  - works with the global application state
+ *  - uses client-side navigation via the Next.js router
+ */
 
-export default function StartPage() {
+import { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useGameStore } from '@/store/useGameStore';
+
+/*
+ * Imported components may be used for:
+ *  - previewing the game state
+ *  - initializing data before transitioning to the game page
+ */
+import { Board } from '@/components/Board';
+import { Players } from '@/components/Players';
+import { Rack } from '@/components/Rack';
+import { PlaceWordControls } from '@/components/PlaceWordControls';
+import { NicknameDialog } from '@/components/NicknameDialog';
+
+export default function HomePage() {
+  /*
+   * Router is used to navigate to the game page
+   * after creating or loading a specific game.
+   */
   const router = useRouter();
-  const [players, setPlayers] = useState(2);
-  const [gid, setGid] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [createErr, setCreateErr] = useState<string | null>(null);
-  const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  async function onCreate() {
-    try {
-      setLoading(true);
-      setCreateErr(null);
-      const { game_id } = await newGame(players);
-      router.push(`/game/${game_id}`);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setCreateErr(msg || "Create failed");
-    } finally {
-      setLoading(false);
-    }
-  }
+  /*
+   * Game identifier used when loading
+   * an existing in-progress game.
+   */
+  const { id } = useParams<{ id: string }>();
 
-  function onLoad() {
-    const id = gid.trim();
-    if (!id) {
-      setLoadErr("Please enter a GAME ID");
-      return;
+  /*
+   * Global game state:
+   * allows creating or loading a game
+   * before transitioning to the game UI.
+   */
+  const loadGame = useGameStore((s) => s.loadGame);
+  const loading = useGameStore((s) => s.loading);
+  const error = useGameStore((s) => s.error);
+
+  /*
+   * If a game ID is available, load the corresponding game
+   * and prepare the transition to the game page.
+   */
+  useEffect(() => {
+    if (id) {
+      loadGame(id);
     }
-    setLoadErr(null);
-    router.push(`/game/${id}`);
-  }
+  }, [id, loadGame]);
 
   return (
-    <main className="mx-auto max-w-md space-y-6 p-6">
-      <header className="flex flex-col items-center gap-2">
-        {/* SCRABBLE */}
-        <div className="flex gap-[6px]">
-          {"SCRABBLE".split("").map((ch, i) => (
-            <TitleTile key={i}>{ch}</TitleTile>
-          ))}
-        </div>
+    <div className="min-h-screen bg-slate-900 text-white">
+      {/* Nickname input dialog – may appear during
+          initialization of a new or loaded game */}
+      <NicknameDialog />
 
-        {/* BY DOLLY */}
-        <div className="flex gap-1">
-          {"BY DOLLY".split("").map((ch, i) =>
-            ch === " " ? (
-              <div key={i} className="w-4" />
-            ) : (
-              <div
-                key={i}
-                className="
-            flex h-8 w-8 items-center justify-center
-            rounded-md
-            bg-slate-700
-            text-[12px] font-bold tracking-wide
-            text-slate-100
-          "
-              >
-                {ch}
-              </div>
-            )
-          )}
-        </div>
+      {/* Landing page header */}
+      <header className="flex items-center gap-3 p-4">
+        <h1 className="text-xl font-bold">Scrabble</h1>
       </header>
 
-      {/* Number of players */}
-      <label className="block space-y-1">
-        <span className="text-sm text-slate-300">Number of players</span>
-        <input
-          type="number"
-          min={2}
-          max={4}
-          value={players}
-          onChange={(e) => setPlayers(parseInt(e.target.value || "2", 10))}
-          className="
-            w-full rounded-md border border-slate-700
-            bg-slate-900 px-3 py-2
-            text-lg font-semibold text-white
-            focus:outline-none focus:ring-2 focus:ring-sky-500
-          "
-        />
-      </label>
+      {/* Main content of the landing page */}
+      <main className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 p-4">
+        <section>
+          <Board />
+        </section>
 
-      {/* Create game */}
-      <button
-        type="button"
-        disabled={loading}
-        onClick={onCreate}
-        className="
-          w-full rounded-lg bg-sky-700 px-4 py-3
-          font-bold text-white
-          hover:bg-sky-600
-          disabled:opacity-50
-        "
-      >
-        CREATE GAME
-      </button>
-      {createErr && <p className="text-sm text-red-500">{createErr}</p>}
+        <aside className="flex flex-col gap-4">
+          <Players />
+          <PlaceWordControls />
+          <Rack />
+        </aside>
+      </main>
 
-      {/* Load game */}
-      <div className="flex items-center gap-2">
-        <input
-          placeholder="GAME ID"
-          value={gid}
-          onChange={(e) => {
-            setGid(e.target.value.toUpperCase());
-            if (loadErr) setLoadErr(null);
-          }}
-          className="
-            flex-1 rounded-md border border-slate-700
-            bg-slate-900 px-3 py-2
-            font-mono text-white
-            placeholder:text-slate-500
-            focus:outline-none focus:ring-2 focus:ring-sky-500
-          "
-        />
-        <button
-          type="button"
-          disabled={loading || !gid.trim()}
-          onClick={onLoad}
-          className="
-            rounded-lg bg-sky-700 px-4 py-2
-            font-bold text-white
-            hover:bg-sky-600
-            disabled:opacity-50
-          "
-        >
-          LOAD
-        </button>
-      </div>
-      {loadErr && <p className="text-sm text-red-500">{loadErr}</p>}
+      {/* Loading state */}
+      {loading && (
+        <div className="p-4 text-center text-slate-400">
+          Loading…
+        </div>
+      )}
 
-      <p className="text-xs text-slate-500">
-        BE: {process.env.NEXT_PUBLIC_API_URL}
-      </p>
-    </main>
+      {/* Error state */}
+      {error && (
+        <div className="p-4 text-center text-red-400">
+          {error}
+        </div>
+      )}
+    </div>
   );
 }
